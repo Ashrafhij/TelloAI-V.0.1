@@ -90,187 +90,170 @@ def detect_aruco_codes(frame, aruco_dict, aruco_params):
 
 ```
 
-### Part B: Live Video QR Code Detection and Movement Command Generation
+### Part B: Live Video ArUco Code Detection and Movement Command Generation
 
 ### Usage
 
-1. **Detect QR codes in live video:**
+1. **Detect ArUco codes in live video:**
 
     ```python
     import cv2
     import numpy as np
-    from pyzbar.pyzbar import decode
+    
+    
+    def detect_aruco_codes(frame, aruco_dict, aruco_params):
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
 
-    # Function to detect QR codes and return their positions and sizes
-    def detect_qr_codes(frame):
-        qr_codes = decode(frame)
-        qr_data = []
+    # Create ArucoDetector object
+    detector = cv2.aruco.ArucoDetector(aruco_dict, aruco_params)
 
-        for qr in qr_codes:
-            qr_id = qr.data.decode('utf-8')
-            points = qr.polygon
+    # Detect markers
+    corners, ids, rejected = detector.detectMarkers(gray)
+    aruco_data = []
 
-            if len(points) == 4:
-                pts = np.array([(point.x, point.y) for point in points], dtype=np.float32)
-                area = cv2.contourArea(pts)
-                qr_data.append({
-                    'id': qr_id,
-                    'points': pts,
-                    'area': area
-                })
+    if ids is not None:
+        for i, aruco_id in enumerate(ids):
+            pts = corners[i][0]  # corners[i] returns the corners of the i-th marker
+            area = cv2.contourArea(pts)
+            aruco_data.append(
+                {
+                    "id": aruco_id,
+                    "points": pts.tolist(),  # Convert to list for dictionary
+                    "area": area,
+                    "center": np.mean(pts, axis=0),  # Calculate center of the marker
+                }
+            )
 
-        return qr_data
+            # Draw ArUco marker and ID
+            cv2.polylines(frame, [pts.astype(int)], True, (0, 255, 0), 2)
+            cv2.putText(
+                frame,
+                f"ID: {aruco_id}",
+                tuple(pts[0].astype(int)),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                1,
+                (0, 255, 0),
+                2,
+            )
 
-    # Test QR code detection in live video
-    def test_detect_qr_codes_live():
-        cap = cv2.VideoCapture(0)  # Use 0 for the default camera
+    return aruco_data
 
-        if not cap.isOpened():
-            print("Error: Could not open video stream.")
-            return
 
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
+    # Function to calculate movements to center the marker and return message when centered
+    def calculate_movement(frame_center, marker_center):
+        delta_x = marker_center[0] - frame_center[0]
+        delta_y = marker_center[1] - frame_center[1]
 
-            qr_data = detect_qr_codes(frame)
-            for qr in qr_data:
-                pts = qr['points']
-                pts = pts.reshape((-1, 1, 2)).astype(np.int32)
-                cv2.polylines(frame, [pts], isClosed=True, color=(0, 255, 0), thickness=2)
-                cv2.putText(frame, qr['id'], tuple(pts[0][0]), cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 0), 2)
+    commands = []
 
-            cv2.imshow('Live Video Test', frame)
+    if abs(delta_x) > 10:  # Adjust this threshold as needed
+        if delta_x > 0:
+            commands.append("right")
+        else:
+            commands.append("left")
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+    if abs(delta_y) > 10:  # Adjust this threshold as needed
+        if delta_y > 0:
+            commands.append("down")
+        else:
+            commands.append("up")
 
-        cap.release()
-        cv2.destroyAllWindows()
+    if abs(delta_x) <= 10 and abs(delta_y) <= 10:
+        commands.append("centered")  # Add centered message
 
-    # Run the test
-    test_detect_qr_codes_live()
-    ```
+    return commands
 
-2. **Generate movement commands based on detected QR codes:**
 
-    ```python
-    import cv2
-    import numpy as np
-    from pyzbar.pyzbar import decode
+    # Load the target frame
+    target_frame = cv2.imread("target_frame.png")
+    
+    # Ensure aruco module is available
+    if not hasattr(cv2, "aruco"):
+        raise ImportError(
+            "OpenCV does not have the 'aruco' module. Make sure you have the correct version of OpenCV installed."
+        )
+    
+    # ArUco dictionary and parameters
+    dictionary = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_4X4_250)
+    parameters = cv2.aruco.DetectorParameters()
+    detector = cv2.aruco.ArucoDetector(dictionary, parameters)
+    
+    # Detect target ArUco codes
+    target_arucos = detect_aruco_codes(target_frame, dictionary, parameters)
+    
+    # Use DroidCam as the video capture device
+    cap = cv2.VideoCapture('http://192.168.35.149:4747/video')  # Replace with your DroidCam URL
+    
+    if not cap.isOpened():
+        print("Error: Could not open video stream.")
+        exit()
+    
+    # Get frame dimensions
+    ret, frame = cap.read()
+    if not ret:
+        print("Error: Could not read frame dimensions.")
+        exit()
+    
+    frame_height, frame_width, _ = frame.shape
+    frame_center = (frame_width // 2, frame_height // 2)
+    
+    while True:
+        ret, frame = cap.read()
+        if not ret:
+            break
 
-    # Function to detect QR codes and return their positions and sizes
-    def detect_qr_codes(frame):
-        qr_codes = decode(frame)
-        qr_data = []
+    current_arucos = detect_aruco_codes(frame, dictionary, parameters)
 
-        for qr in qr_codes:
-            qr_id = qr.data.decode('utf-8')
-            points = qr.polygon
-
-            if len(points) == 4:
-                pts = np.array([(point.x, point.y) for point in points], dtype=np.float32)
-                area = cv2.contourArea(pts)
-                qr_data.append({
-                    'id': qr_id,
-                    'points': pts,
-                    'area': area
-                })
-
-        return qr_data
-
-    # Function to generate movement commands based on QR code positions
-    def generate_movement_commands(target_qrs, current_qrs):
-        commands = []
-
-        for target in target_qrs:
-            target_center = np.mean(target['points'], axis=0)
-            target_area = target['area']
-            current = next((c for c in current_qrs if c['id'] == target['id']), None)
-
-            if current:
-                current_center = np.mean(current['points'], axis=0)
-                current_area = current['area']
-                delta_x = target_center[0] - current_center[0]
-                delta_y = target_center[1] - current_center[1]
-                area_ratio = target_area / current_area if current_area > 0 else 1
-
-                # Determine movement direction
-                if abs(delta_x) > 50:  # Threshold for horizontal movement
-                    if delta_x > 0:
-                        commands.append("right")
-                    else:
-                        commands.append("left")
-
-                if abs(delta_y) > 50:  # Threshold for vertical movement
-                    if delta_y > 0:
-                        commands.append("down")
-                    else:
-                        commands.append("up")
-
-                if area_ratio > 1.1:  # Threshold for forward movement
-                    commands.append("forward")
-                elif area_ratio < 0.9:  # Threshold for backward movement
-                    commands.append("backward")
-
-                # Calculate rotation (simplified method)
-                angle_diff = np.arctan2(current_center[1] - target_center[1], current_center[0] - target_center[0])
-                if abs(angle_diff) > 0.1:  # Threshold for rotation
-                    if angle_diff > 0:
-                        commands.append("turn-left")
-                    else:
-                        commands.append("turn-right")
-
-        if not commands:
-            commands.append("hold")
-
-        return commands
-
-    # Test movement command generation
-    def test_generate_movement_commands():
-        # Load the target frame
-        target_frame_path = 'target_frame_test.png'
-        target_frame = cv2.imread(target_frame_path)
-
-        if target_frame is None:
-            print(f"Error: Could not open or find the image {target_frame_path}.")
-            return
-
-        target_qrs = detect_qr_codes(target_frame)
-
-        # Initialize video capture
-        cap = cv2.VideoCapture(0)  # Use 0 for the default camera
-
-        if not cap.isOpened():
-            print("Error: Could not open video stream.")
-            return
-
-        while True:
-            ret, frame = cap.read()
-            if not ret:
-                break
-
-            current_qrs = detect_qr_codes(frame)
-            commands = generate_movement_commands(target_qrs, current_qrs)
-
-            # Display the commands on the frame
+    # Display the commands on the frame
+    if current_arucos:
+        for aruco in current_arucos:
+            marker_center = aruco["center"]
+            commands = calculate_movement(frame_center, marker_center)
             for i, command in enumerate(commands):
-                cv2.putText(frame, command, (10, 30 * (i + 1)), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                if command == "centered":
+                    cv2.putText(
+                        frame,
+                        "Centered",
+                        (10, 30 * (i + 1)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 255, 0),
+                        2,
+                    )
+                else:
+                    cv2.putText(
+                        frame,
+                        command,
+                        (10, 30 * (i + 1)),
+                        cv2.FONT_HERSHEY_SIMPLEX,
+                        1,
+                        (0, 255, 0),
+                        2,
+                    )
+    else:
+        cv2.putText(
+            frame,
+            "No ArUco code detected",
+            (10, 30),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            (0, 0, 255),
+            2,
+        )
 
-            # Show the frame
-            cv2.imshow('Live Video Command Test', frame)
+    # Show the frame
+    cv2.imshow("Live Video", frame)
 
-            if cv2.waitKey(1) & 0xFF == ord('q'):
-                break
+    # Break the loop on 'q' key press
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        break
 
-        cap.release()
-        cv2.destroyAllWindows()
+    # Release the video capture and close windows
+    cap.release()
+    cv2.destroyAllWindows()
 
-        # Run the test
-    test_generate_movement_commands()
     ```
- Image exammple of the detection and the movement commands:
-![movement_commands test](https://github.com/nirmeir/TelloAI-V.0.1/assets/24902621/4e6d925d-e0aa-4b3a-9795-3ba3de7b9d60)
+ Video exammple of the detection and the movement commands:
+![movement_commands test](screen_record.mp4)
 
 
