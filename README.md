@@ -255,5 +255,6 @@ def detect_aruco_codes(frame, aruco_dict, aruco_params):
     ```
  Video exammple of the detection and the movement commands:
 ![movement_commands test](screen_record.mp4)
+(https://raw.githubusercontent.com/username/repository/branch/path/to/thumbnail.jpg)](https://raw.githubusercontent.com/username/repository/branch/path/to/screen_record.mp4)
 
 
