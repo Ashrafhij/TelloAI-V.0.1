@@ -254,7 +254,6 @@ def detect_aruco_codes(frame, aruco_dict, aruco_params):
 
     ```
  Video exammple of the detection and the movement commands:
-![movement_commands test](screen_record.mp4)
-(https://raw.githubusercontent.com/username/repository/branch/path/to/thumbnail.jpg)](https://raw.githubusercontent.com/username/repository/branch/path/to/screen_record.mp4)
+![movement_commands test]([screen_record.mp4](https://github.com/Ashrafhij/TelloAI-V.0.1/assets/74490789/cc6f937d-9724-4431-9ea9-60cf2b1f37ed))
 
 
